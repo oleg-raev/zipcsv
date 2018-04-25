@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"log"
 	"strings"
-	"csvaggr/zipcsv"
+	"zipcsv/zipcsv"
 )
 
 /*
@@ -20,9 +20,6 @@ UID носителя,
 ѕор порядковый номер поездки по билету (если будет проставлен в системе),
 количество оставшихся поездок по билету (если будет проставлено в системе)
  */
-
-
-
 
 func main() {
 	result := make(map[string]int64)
@@ -39,8 +36,6 @@ func main() {
 
 	rows, errs := zipcsv.ProcessFiles(files)
 
-	counter :=
-
 	loop:
 	for {
 		select {
@@ -48,7 +43,7 @@ func main() {
 			if !ok {
 				break loop
 			}
-			processRow(row, &result)
+			processRow(row, result)
 		case err, ok := <- errs:
 			if !ok {
 				break loop
@@ -62,7 +57,7 @@ func main() {
 	}
 }
 
-func processRow(row string, result *map[string]int64) {
+func processRow(row string, result map[string]int64) {
 	data := strings.Split(row, ";")
 	if len(data) < 1 || len(data[0]) < 13 {
 		return
@@ -70,13 +65,12 @@ func processRow(row string, result *map[string]int64) {
 
 	key := data[0][11:13]
 
-	if _, ok := (*result)[key]; !ok {
-		(*result)[key] = 0
+	if _, ok := result[key]; !ok {
+		result[key] = 0
 	}
 
-	(*result)[key]++
+	result[key]++
 }
-
 
 func getCurrentDir() string {
 	if dir, err := filepath.Abs(filepath.Dir(os.Args[0])); err != nil {
