@@ -1,50 +1,28 @@
 package main
 
 import (
+	"bufio"
+	"compress/gzip"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
-	"path/filepath"
-	"log"
 	"strings"
-	"zipcsv/zipcsv"
 )
-
-/*
-дата/время, //2017-07-01T09:28:22
-id вестибюля,
-номер билета,
-UID носителя,
-Тип билета,
-Тип прохода ( 0 - проходы, 1 - внешние пересадки, -1 - внутренние пересадки),
-ѕор порядковый номер поездки по билету (если будет проставлен в системе),
-количество оставшихся поездок по билету (если будет проставлено в системе)
- */
 
 func main() {
 	result := make(map[string]int64)
 
-	dir := getCurrentDir()
-	files := listFilesOfDir(dir)
+	rows, errs := inputDataProcessing()
 
-	fmt.Printf("Hello world. Current dir is: %q\n", dir)
-	fmt.Printf("ZIP files in the directory: %v\n", files)
-	if len(files) < 1 {
-		fmt.Println("Have no found ZIP files in the directory")
-		os.Exit(0)
-	}
-
-	rows, errs := zipcsv.ProcessFiles(files)
-
-	loop:
+loop:
 	for {
 		select {
-		case row, ok := <- rows:
+		case row, ok := <-rows:
 			if !ok {
 				break loop
 			}
 			processRow(row, result)
-		case err, ok := <- errs:
+		case err, ok := <-errs:
 			if !ok {
 				break loop
 			}
@@ -55,6 +33,45 @@ func main() {
 	for key, val := range result {
 		fmt.Printf("%s => %d\n", key, val)
 	}
+}
+
+func inputDataProcessing() (<-chan string, <-chan error) {
+	var (
+		chOut = make(chan string)
+		chErr = make(chan error)
+	)
+
+	in, err := gzip.NewReader(os.Stdin)
+	if err != nil {
+		panic(err)
+	}
+
+	go func() {
+		for err := range chErr {
+			//TODO handle errors
+			fmt.Println(err)
+		}
+	}()
+
+	go func() {
+		reader := bufio.NewReader(in)
+		for {
+			line, _, err := reader.ReadLine()
+			if err != nil {
+				if err == io.EOF {
+					fmt.Println("CLOSED")
+					break
+				}
+				chErr <- err
+			}
+			fmt.Println(string(line))
+			chOut <- string(line)
+		}
+		close(chErr)
+		close(chOut)
+	}()
+
+	return chOut, chErr
 }
 
 func processRow(row string, result map[string]int64) {
@@ -70,31 +87,4 @@ func processRow(row string, result map[string]int64) {
 	}
 
 	result[key]++
-}
-
-func getCurrentDir() string {
-	if dir, err := filepath.Abs(filepath.Dir(os.Args[0])); err != nil {
-		log.Fatal(err)
-		return ""
-	} else {
-		return dir
-	}
-	return ""
-}
-
-func listFilesOfDir(dir string) []string {
-	var result []string
-
-	files, err := ioutil.ReadDir(dir)
-	if err != nil {
-		log.Fatal(err)
-	}
-	for _, file := range files {
-		if file.IsDir() || !zipcsv.IsZIP(file.Name()) {
-			continue
-		}
-		result = append(result, dir + string(os.PathSeparator) + file.Name())
-	}
-
-	return result
 }
