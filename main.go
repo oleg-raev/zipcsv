@@ -9,6 +9,7 @@ import (
 	"strings"
 )
 
+// It's a main function. Will be called at the start.
 func main() {
 	result := make(map[string]int64)
 
